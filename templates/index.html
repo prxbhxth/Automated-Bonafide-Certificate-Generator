@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Generate Certificate{% endblock %}
+{% block content %}
+<div class="glass">
+  <h2 style="margin-bottom:8px">Generate Bonafide Certificate</h2>
+
+  <div style="margin-bottom:12px">
+    <textarea
+      id="requestText"
+      placeholder="Enter your request..."
+      style="width:100%;min-height:120px;padding:12px;border-radius:10px;
+             border:1px solid rgba(255,255,255,0.06);background:transparent;
+             color:#fff;resize:none;overflow-y:auto;"></textarea>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:12px;">
+    <button id="extractBtn"
+      style="flex:1;padding:12px;border-radius:10px;
+             background:linear-gradient(90deg,var(--accent-start),var(--accent-end));
+             border:none;color:#fff;font-weight:700;cursor:pointer;"
+      onclick="extractEntities()">Extract Information</button>
+
+    <button id="sampleBtn"
+      style="padding:12px 18px;border-radius:10px;border:1px solid var(--glass-border);
+             background:rgba(255,255,255,0.08);color:#fff;font-weight:600;cursor:pointer;"
+      onclick="fillSample()">Sample</button>
+
+    <button id="resetBtn"
+      style="padding:12px 18px;border-radius:10px;border:1px solid var(--glass-border);
+             background:rgba(255,255,255,0.08);color:#fff;font-weight:600;cursor:pointer;"
+      onclick="resetForm()">Reset</button>
+  </div>
+
+  <div id="resultsSection" style="display:none;margin-top:14px;
+       background:rgba(20,40,60,0.55);border:1px solid rgba(255,255,255,0.1);
+       border-radius:12px;padding:18px;backdrop-filter:blur(12px);">
+
+    <div id="statusMessage" style="margin-bottom:10px;font-weight:600;"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="input-field">
+        <label>Name</label>
+        <input id="name" />
+      </div>
+      <div class="input-field">
+        <label>Roll Number</label>
+        <input id="rollNumber" />
+      </div>
+      <div class="input-field">
+        <label>Course</label>
+        <input id="course" />
+      </div>
+      <div class="input-field">
+        <label>Year</label>
+        <input id="year" />
+      </div>
+      <div class="input-field" style="grid-column:1 / -1;">
+        <label>Purpose</label>
+        <input id="purpose" />
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button id="generateBtn"
+        style="flex:1;padding:12px;border-radius:10px;
+               background:linear-gradient(90deg,var(--accent-start),var(--accent-end));
+               border:none;color:#fff;font-weight:700;cursor:pointer;"
+        onclick="generatePDF()">Generate PDF</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API_BASE = '';
+
+function showStatus(msg, type) {
+  const div = document.getElementById('statusMessage');
+  div.style.color =
+    type === 'error' ? '#ef9a9a' :
+    type === 'warning' ? '#ffe082' :
+    '#a5d6a7';
+  div.textContent = msg;
+}
+
+function resetForm() {
+  document.getElementById('requestText').value = '';
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('statusMessage').textContent = '';
+}
+
+async function extractEntities() {
+  const text = document.getElementById('requestText').value.trim();
+  if (!text) {
+    showStatus('Enter a request text first.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = true;
+  btn.textContent = 'Extracting...';
+
+  try {
+    const res = await fetch(API_BASE + '/api/extract', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('resultsSection').style.display = 'block';
+      fillExtracted(data);
+    } else {
+      showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    showStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Extract Information';
+  }
+}
+
+function fillExtracted(data) {
+  const e = data.extracted || {};
+  document.getElementById('name').value = e.name || '';
+  document.getElementById('rollNumber').value = e.roll_number || '';
+  document.getElementById('course').value = e.course || '';
+  document.getElementById('year').value = e.year || '';
+  document.getElementById('purpose').value = e.purpose || '';
+
+  document.querySelectorAll('.input-field input').forEach(inp => {
+    inp.style.borderColor = 'rgba(255,255,255,0.2)';
+    inp.style.boxShadow = 'none';
+  });
+
+  (data.missing_fields || []).forEach(f => {
+    const map = { name:'name', roll_number:'rollNumber', course:'course', year:'year', purpose:'purpose' };
+    const el = document.getElementById(map[f]);
+    if (el) {
+      el.style.borderColor = '#ef5350';
+      el.style.boxShadow = '0 0 6px rgba(239,83,80,0.5)';
+    }
+  });
+
+  if (data.is_valid) showStatus('All information extracted successfully.', 'success');
+  else showStatus('Missing: ' + data.missing_fields.join(', '), 'warning');
+}
+
+async function generatePDF() {
+  const payload = {
+    name: document.getElementById('name').value.trim(),
+    roll_number: document.getElementById('rollNumber').value.trim(),
+    course: document.getElementById('course').value.trim(),
+    year: document.getElementById('year').value.trim(),
+    purpose: document.getElementById('purpose').value.trim()
+  };
+
+  const missing = Object.keys(payload).filter(k => !payload[k]);
+  if (missing.length) {
+    showStatus('Fill missing fields: ' + missing.join(', '), 'error');
+    return;
+  }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  try {
+    const res = await fetch(API_BASE + '/api/generate-pdf', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bonafide_${payload.roll_number || 'student'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showStatus('PDF generated successfully.', 'success');
+    } else {
+      const err = await res.json();
+      showStatus('Error: ' + (err.error || 'Server error'), 'error');
+    }
+  } catch (e) {
+    showStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate PDF';
+  }
+}
+
+const samples = [
+  "Respected Sir, I am Aravind Kumar, roll number 22BCE0412, from CSE. Kindly issue a bonafide certificate for passport application.",
+  "Dear Sir, I'm Priya Nair, 21BCE3098 from CSE. Requesting bonafide certificate for higher studies abroad.",
+  "Hello Sir, I'm Kavin Raj from IT 23BIT0275. Please provide a bonafide certificate for bank loan purpose.",
+  "Good morning Sir, I'm Sneha Iyer, 22BEC0123 from ECE. Kindly issue bonafide certificate for internship verification.",
+  "Respected faculty, I'm Krithika S, roll 23BBT0179 from Biotechnology. Please issue bonafide for scholarship renewal.",
+  "Hi Sir, I am Anirudh K, 22BME0330 from Mechanical Engineering. Kindly provide a bonafide certificate for internship application.",
+  "Respected Sir, I'm Meera George (21BCV0244) from Civil Engineering. Please issue a bonafide certificate for hostel admission.",
+  "Good evening Sir, I'm Prakash N, 22BCH0191 from Chemical Engineering. I need a bonafide for visa application.",
+  "Dear Sir, I'm Rohan Singh, 23BAI0167 from AI and Data Science. Requesting bonafide certificate for university document verification."
+];
+
+
+function fillSample() {
+  const randomSample = samples[Math.floor(Math.random() * samples.length)];
+  document.getElementById('requestText').value = randomSample;
+}
+</script>
+{% endblock %}

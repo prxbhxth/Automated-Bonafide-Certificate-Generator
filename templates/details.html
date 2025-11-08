@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}System Details{% endblock %}
+{% block content %}
+<div class="glass" style="max-width:1100px;margin:0 auto 40px auto;line-height:1.6;">
+  <h2 style="margin-bottom:10px;">System Details</h2>
+  <p style="color:var(--muted);margin-bottom:20px;">
+    The Automated Bonafide Generator combines a <b>BERT-based information extraction</b> pipeline with
+    <b>rule-based validation</b> to automatically fill and generate student bonafide certificates.
+  </p>
+
+  <div class="glass" style="padding:18px;margin-bottom:20px;">
+    <h3 style="margin-bottom:8px;">System Overview</h3>
+    <ul style="list-style:none;padding:0;">
+      <li><b>Frontend:</b> Flask web interface</li>
+      <li><b>Backend:</b> Python Flask REST API serving BERT extraction and PDF generation</li>
+      <li><b>Model Type:</b> Hybrid BERT + Rule-based NLP system</li>
+      <li><b>Dataset:</b> Custom fine-tuned on student request examples (VIT context)</li>
+      <li><b>Output:</b> Auto-generated PDF certificate using ReportLab Module</li>
+    </ul>
+  </div>
+
+  <div class="glass" style="padding:18px;margin-bottom:20px;">
+    <h3 style="margin-bottom:8px;">Model Architecture</h3>
+    <ul style="list-style:none;padding:0;">
+      <li><b>BERT NER Extractor:</b> (<code>bert_ner.py</code>)  
+        Fine-tuned <code>bert-base-uncased</code> for token-level entity recognition.
+        Extracts fields such as <i>Name, Roll Number, Course, Year,</i> and <i>Purpose</i>.
+      </li>
+      <li><b>BERT Purpose Classifier:</b> (<code>bert_classifier.py</code>)  
+        Fine-tuned <code>bert-base-uncased</code> sequence classifier that predicts the <i>purpose</i> of the request.
+      </li>
+      <li><b>Rule-Based Extractor:</b> (<code>extractor.py</code>)  
+        Uses regex and keyword heuristics to extract or validate missing entities.
+        Handles structured data like Roll Numbers and Year.
+      </li>
+      <li><b>Hybrid Extractor:</b> (<code>hybrid_extractor.py</code>)  
+        Orchestrates both BERT models and rule-based methods.  
+        Performs validation, normalization, and fallbacks.
+      </li>
+      <li><b>PDF Generator:</b> (<code>pdf_generator.py</code>)  
+        Dynamically generates the bonafide certificate in PDF format using ReportLab.
+      </li>
+    </ul>
+  </div>
+
+  <div class="glass" style="padding:18px;margin-bottom:20px;">
+    <h3 style="margin-bottom:10px;">Processing Flow</h3>
+    <p style="color:var(--muted);">
+      The following flow represents the internal logic of the system:
+    </p>
+
+    <div style="margin-top:10px;padding:16px;border-radius:12px;background:rgba(255,255,255,0.06);font-family:'JetBrains Mono',monospace;">
+      <div>Input Request → BERT NER Extractor → Extract Entities</div>
+      <br>
+      <div>→ BERT Classifier → Predict Purpose</div>
+      <div>→ Rule-based Enhancer → Validate + Fix Missing Fields</div>
+      <div>→ Hybrid Extractor Output → PDF Generator → Bonafide Certificate</div>
+    </div>
+  </div>
+
+  <div class="glass" style="padding:18px;">
+    <h3 style="margin-bottom:10px;">Extraction Logic</h3>
+    <ul style="list-style:none;padding:0;">
+      <li><b>Name</b>: BERT NER prediction validated via regex and length rules.</li>
+      <li><b>Roll Number</b>: Always verified with pattern <code>\d{2}[A-Z]{2}\d{3}</code>.</li>
+      <li><b>Course</b>: Normalized into canonical format (e.g., “B.Tech Computer Science”).</li>
+      <li><b>Year</b>: Converted into human-readable form (e.g., “3rd year”).</li>
+      <li><b>Purpose</b>: Predicted via BERT classifier or extracted via keywords.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
